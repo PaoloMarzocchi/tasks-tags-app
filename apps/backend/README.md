@@ -59,3 +59,275 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+# Tasks & Tags API
+
+A Laravel-based REST API for managing tasks and tags with authentication.
+
+## Setup
+
+### Prerequisites
+- PHP 8.1+
+- Composer
+- SQLite (or MySQL/PostgreSQL)
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   composer install
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+3. **Configure database:**
+   ```bash
+   # For SQLite (default)
+   touch database/database.sqlite
+   
+   # Or update .env for MySQL/PostgreSQL
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=your_database
+   DB_USERNAME=your_username
+   DB_PASSWORD=your_password
+   ```
+
+4. **Run migrations:**
+   ```bash
+   php artisan migrate
+   ```
+
+5. **Seed the database:**
+   ```bash
+   php artisan db:seed
+   ```
+
+6. **Start the server:**
+   ```bash
+   php artisan serve
+   ```
+
+## Authentication
+
+The API uses Laravel Sanctum for Bearer token authentication.
+
+### Demo User
+After seeding, a demo user is available:
+- **Email:** `demo@local`
+- **Password:** `demo1234`
+
+### Login
+
+**Endpoint:** `POST /api/auth/login`
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@local",
+    "password": "demo1234"
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "1|abc123def456...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+### Using the Bearer Token
+
+Include the token in the `Authorization` header for protected endpoints:
+
+```bash
+curl -X GET http://localhost:8000/api/auth/me \
+  -H "Authorization: Bearer 1|abc123def456..." \
+  -H "Content-Type: application/json"
+```
+
+### Logout
+
+**Endpoint:** `POST /api/auth/logout`
+
+```bash
+curl -X POST http://localhost:8000/api/auth/logout \
+  -H "Authorization: Bearer 1|abc123def456..." \
+  -H "Content-Type: application/json"
+```
+
+**Response:** `204 No Content`
+
+## API Endpoints
+
+### Public Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/auth/login` | User login |
+
+### Protected Endpoints
+
+All endpoints below require `Authorization: Bearer <token>` header.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/auth/me` | Get current user info |
+| `POST` | `/api/auth/logout` | Logout (invalidate token) |
+| `GET` | `/api/tags` | List all tags |
+| `POST` | `/api/tags` | Create a new tag |
+| `GET` | `/api/tags/{id}` | Get a specific tag |
+| `PATCH` | `/api/tags/{id}` | Update a tag |
+| `DELETE` | `/api/tags/{id}` | Delete a tag |
+| `GET` | `/api/tasks` | List all tasks |
+| `POST` | `/api/tasks` | Create a new task |
+| `GET` | `/api/tasks/{id}` | Get a specific task |
+| `PATCH` | `/api/tasks/{id}` | Update a task |
+| `DELETE` | `/api/tasks/{id}` | Delete a task |
+
+## Complete Example Workflow
+
+### 1. Login and Get Token
+```bash
+# Login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@local",
+    "password": "demo1234"
+  }'
+
+# Save the token
+TOKEN="1|abc123def456..."
+```
+
+### 2. Get User Info
+```bash
+curl -X GET http://localhost:8000/api/auth/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+### 3. Health Check (Public)
+```bash
+curl -X GET http://localhost:8000/api/health \
+  -H "Content-Type: application/json"
+```
+
+### 4. Logout
+```bash
+curl -X POST http://localhost:8000/api/auth/logout \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+## Error Responses
+
+### Authentication Errors
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+**Status:** `401 Unauthorized`
+
+### Validation Errors
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "email": ["The email field is required."],
+    "password": ["The password field is required."]
+  }
+}
+```
+**Status:** `422 Unprocessable Entity`
+
+### Not Found
+```json
+{
+  "message": "No query results for model [App\\Models\\User] 123"
+}
+```
+**Status:** `404 Not Found`
+
+## Development
+
+### Running Tests
+```bash
+# Run all tests
+php artisan test
+
+# Run specific test file
+php artisan test tests/Feature/AuthTest.php
+
+# Run with coverage
+php artisan test --coverage
+```
+
+### Database Reset
+```bash
+# Reset and seed
+php artisan migrate:fresh --seed
+
+# Reset without seeding
+php artisan migrate:fresh
+```
+
+### Creating New Users
+```bash
+# Via tinker
+php artisan tinker
+User::create(['email' => 'user@example.com', 'password' => Hash::make('password'), 'name' => 'User Name']);
+
+# Or add to UserSeeder
+```
+
+## Database Schema
+
+### Users Table
+- `id` (ULID, Primary Key)
+- `email` (Unique)
+- `password` (Hashed)
+- `name` (Nullable)
+- `created_at`, `updated_at`
+
+### Tags Table
+- `id` (ULID, Primary Key)
+- `name`
+- `slug` (Unique)
+- `color` (Nullable)
+- `parent_id` (Nullable, Foreign Key to tags.id)
+- `created_at`, `updated_at`
+
+### Tasks Table
+- `id` (ULID, Primary Key)
+- `title`
+- `description` (Nullable)
+- `status` (Enum: todo, doing, done, blocked)
+- `assignee` (Nullable)
+- `due_date` (Nullable)
+- `created_at`, `updated_at`
+
+### Task Tags Table (Pivot)
+- `task_id` (ULID, Foreign Key)
+- `tag_id` (ULID, Foreign Key)
+- Composite Primary Key: `[task_id, tag_id]`
+
+## Security Notes
+
+- All passwords are hashed using Laravel's `Hash::make()`
+- Tokens are stored securely in the `personal_access_tokens` table
+- Tokens are automatically invalidated on logout
+- All protected endpoints require valid Bearer token
+- CORS is configured for API access only
